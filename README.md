@@ -22,6 +22,8 @@ Usage: ./lsof.sh [-p <pid>] [-t <App Name>] [-a] [-c]
 -t list all open files for for grepped app.
 -p list all open files for pid.
 -c prints count of all files open by all processes
+-m list all mapped files for pid
+-n list all mapped files for name
 ```
 
 #### Example Output :
