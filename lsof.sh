@@ -12,6 +12,8 @@ help() {
 	echo "-t list all open files for for grepped app."
 	echo "-p list all open files for pid."
 	echo "-c prints count of all files open by all processes"
+	echo "-m list all mapped files for pid"
+	echo "-n list all mapped files for name"
 	exit
 }
 
@@ -89,9 +91,49 @@ get_pid_files() {
 	fi
 }
 
+get_mapped_files_by_pid() {
+	pid=$1
+	if [ "$EUID" -ne 0 ]
+	then 
+		echo "This must be run as root."
+	else
+		if [ -d /proc/$pid ]; then
+			exe=$(readlink /proc/$pid/exe);
+			for entry in /proc/$pid/map_files/*;
+			do
+				opened_by="$(stat -c '%U' $entry 2>/dev/null)"
+				echo  "$pid ; $exe ; $opened_by ; $entry ; $(readlink $entry)"
+			done
+		else
+			echo "No Such process : $pid"
+		fi
+	fi
+}
+
+get_mapped_files_by_name() {
+	filename=$1
+	if [ "$EUID" -ne 0 ]
+	then
+		echo "This must be run as root."
+	else
+		find /proc/[1-9]* -maxdepth 0 | while read line; 
+		do 
+			if readlink $line/exe | grep -q $filename; then
+				pid_number="$(echo $line | cut -d '/' -f 3)";
+				exe=$(readlink $line/exe);
+				for entry in "$line"/map_files/*;
+				do
+					opened_by="$(stat -c '%U' $entry 2>/dev/null)"
+					echo "$pid_number ; $exe ; $opened_by ; $entry ; $(readlink $entry)";
+				done
+			fi
+		done 
+	fi
+
+}
 
 ## Thanks to 'https://stackoverflow.com/questions/16483119/an-example-of-how-to-use-getopts-in-bash' for making this simple.
-while getopts ":ahct:p:" o; do
+while getopts ":ahct:p:n:m:" o; do
 	case "${o}" in
 		a)
 			get_all_files
@@ -105,8 +147,17 @@ while getopts ":ahct:p:" o; do
 			get_app_files ${OPTARG}
 			exit 0
 		;;
+		n)
+			get_mapped_files_by_name ${OPTARG}
+			exit 0
+		;;
+		m) 
+			get_mapped_files_by_pid ${OPTARG}
+			exit 0
+			;;
 		c) 
 			count_open_files
+			exit 0
 		;;
 		h | *)
 			help
